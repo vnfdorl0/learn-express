@@ -40,7 +40,7 @@ app.use(session({
         httpOnly: true,
         secure: false,
     },
-    name: 'session-cookie' ,
+    name: 'session-cookie',
 }))
     // resave -> 요청이 올 때 세션에 수정사항이 생기지 않더라도 세션을 다시 저장할지 설정
     // saveUninitialized -> 세션에 저장할 내역이 없더라도 처음부터 세션을 생성할지 설정
@@ -50,15 +50,51 @@ app.use(session({
         // secur: false -> http 가 아닌 환경에서도 사용할 수 있음.
     // name: 'session-cookie' -> 세션 쿠키의 이름을 'session-cookie'로 지정
 
-// app.use('abc', 미들웨어) -> abc로 시작되는 요청에서 미들웨어 실행
-app.use((req, res, next) => {
-    console.log('모든 요청에 다 실행됩니다.');
-    next();
-})
-    // req -> 요청에 대한 정보가 들어 있는 객체
-    // res -> 응답에 대한 정보가 들어있는 객체
-    // next -> 다음 미들웨어로 넘어가는 함수, next를 실행하지 않으면 다음 미들웨어가 실행되지 않음.
+const multer = require('multer'); // multer -> 파일 업로드를 처리하는 라이브러리
+const fs = require('fs'); // -> 파일 시스템을 다루는 노드 내장 모듈
 
+// 'upload' 폴더가 있는지 확인하고, 없을 경우 새로 생성
+try {
+    // 동기적으로 'uploads' 폴더 확인
+    fs.readdirSync('uploads');
+} catch (error) {
+    console.error('uploads 폴더가 없어 uploads 폴더를 생성 합니다.');
+    // 동기적으로 'uploads' 폴더 생성
+    fs.mkdirSync('uploads');
+}
+
+// multer를 이용하여 파일 업로드를 처리하기 위한 미들웨어를 설정
+const upload = multer({
+    // 파일이 저장될 경로와 파일명 설정
+    storage: multer.diskStorage({
+        destination(req, file, done) {
+            done(null, 'uploads/'); // 파일이 저장될 경로 설정
+        },
+        filename(req, file, done) {
+            // 파일의 확장자 추출
+            const ext = path.extname(file.originalname);
+            // 파일명에 현재 시간을 더하여 중복을 피함
+            done(null, path.basename(file.originalname, ext) + Date.now() + ext);
+        },
+    }),
+    // 업로드될 파일의 최대 크기 제한 -> 5MB(5 * 1024 * 1024byte)로 설정
+    limits: { fileSize: 5 * 1024 * 1024 },
+});
+
+// '/upload' 경로로 GET 요청 -> multipart.html 파일을 클라이언트에게 전송
+app.get('/upload', (req, res) => {
+    res.sendFile(path.join(__dirname, 'multipart.html'));
+});
+// '/upload' 경로로 POST 요청이 오면, upload 미들웨어 사용 -> 이미지 파일을 업로드
+app.post('/upload', upload.single('image'), (req, res) => {
+    // upload.single('image') -> 'image'라는 필드에 단일 파일을 업로드하겠다는 의미
+    // 업로드된 파일은 req.file 객체에 저장됨.
+    console.log(req.file);
+    // 업로드된 파일 정보를 콘솔에 츨력
+    res.send('ok');
+});
+
+// app.use('abc', 미들웨어) -> abc로 시작되는 요청에서 미들웨어 실행
 // 루트 경로('/')로 GET 요청이 오면 실행
 app.get('/', (req, res, next) => {
     console.log('GET / 요청에서만 실행됩니다.');
@@ -67,6 +103,9 @@ app.get('/', (req, res, next) => {
     throw new Error('에러는 에러 처리 미들웨어로 갑니다.')
 });
     // app.get(주소, 라우터) -> 주소에 대한 GET요청이 올때 어떤 동작을 할지 적는 부분
+    // req -> 요청에 대한 정보가 들어 있는 객체
+    // res -> 응답에 대한 정보가 들어있는 객체
+    // next -> 다음 미들웨어로 넘어가는 함수, next를 실행하지 않으면 다음 미들웨어가 실행되지 않음.
     // (req, res) => {} -> 다음으로 실행될 콜백 함수를 정의, 이 함수는 req, res를 인자로 받음.
     // throw net Error -> 에러를 발생시키고, 이를 등록된 에러 처리 미들웨어로 전달
 
